@@ -8,7 +8,7 @@
 # Tries `py -3.12`, then `python3.12`, then `python` (with version check).
 #
 # Usage:
-#     Right-click setup.ps1 → "Run with PowerShell"
+#     Right-click setup.ps1 -> "Run with PowerShell"
 #   or from a shell:
 #     powershell -ExecutionPolicy Bypass -File setup.ps1
 
@@ -21,7 +21,7 @@ $VenvDir = Join-Path $BridgeDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 
 Write-Host ""
-Write-Host "── Fibi Companion: Setup ─────────────────────────────────" -ForegroundColor Cyan
+Write-Host "=== Fibi Companion: Setup ===" -ForegroundColor Cyan
 Write-Host "Sidecar-venv: $VenvDir"
 Write-Host ""
 
@@ -72,26 +72,26 @@ if (-not $Python) {
     Read-Host "Enter zum Beenden"
     exit 1
 }
-Write-Host "✓ Python gefunden: $Python" -ForegroundColor Green
+Write-Host "[OK] Python gefunden: $Python" -ForegroundColor Green
 
 # ── Create venv ─────────────────────────────────────────────────────────
 
 if (Test-Path $VenvPython) {
-    Write-Host "✓ venv existiert schon — überspringe Erstellung." -ForegroundColor Green
+    Write-Host "[OK] venv existiert schon - ueberspringe Erstellung." -ForegroundColor Green
 } else {
-    Write-Host "→ Erstelle venv …"
+    Write-Host "-> Erstelle venv ..."
     & $Python -m venv "$VenvDir"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "FEHLER beim venv-Erstellen." -ForegroundColor Red
         Read-Host "Enter zum Beenden"
         exit 1
     }
-    Write-Host "✓ venv erstellt." -ForegroundColor Green
+    Write-Host "[OK] venv erstellt." -ForegroundColor Green
 }
 
 # ── Install / update deps ───────────────────────────────────────────────
 
-Write-Host "→ Aktualisiere pip …"
+Write-Host "-> Aktualisiere pip ..."
 & $VenvPython -m pip install --upgrade --quiet pip
 
 $Packages = @(
@@ -102,7 +102,7 @@ $Packages = @(
     "git+https://github.com/timlaing/pyicloud.git"
 )
 
-Write-Host "→ Installiere Pakete (kann ein paar Minuten dauern) …"
+Write-Host "-> Installiere Pakete (kann ein paar Minuten dauern) ..."
 foreach ($pkg in $Packages) {
     Write-Host "    $pkg"
     & $VenvPython -m pip install --quiet $pkg
@@ -112,26 +112,26 @@ foreach ($pkg in $Packages) {
         exit 1
     }
 }
-Write-Host "✓ Pakete installiert." -ForegroundColor Green
+Write-Host "[OK] Pakete installiert." -ForegroundColor Green
 
 # ── Pre-download openWakeWord pretrained models ─────────────────────────
 
-Write-Host "→ Lade openWakeWord-Built-In-Modelle …"
+Write-Host "-> Lade openWakeWord-Built-In-Modelle ..."
 & $VenvPython -c "import openwakeword.utils; openwakeword.utils.download_models()" 2>&1 | Out-Null
-Write-Host "✓ Built-In-Modelle bereit." -ForegroundColor Green
+Write-Host "[OK] Built-In-Modelle bereit." -ForegroundColor Green
 
 # ── Done ────────────────────────────────────────────────────────────────
 
 Write-Host ""
-Write-Host "── Setup fertig ──────────────────────────────────────────" -ForegroundColor Cyan
+Write-Host "=== Setup fertig ===" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Nächste Schritte:"
-Write-Host "  1. Lege eine `.env`-Datei neben Companion.exe an (siehe `.env.example`)."
-Write-Host "     Mindestens ANTHROPIC_API_KEY + ICLOUD_USERNAME + ICLOUD_APP_PASSWORD."
-Write-Host ""
-Write-Host "  2. Einmalig die iCloud-Auth (Apple-Passwort + 2FA-Code):"
-Write-Host "     `"$VenvPython`" `"$BridgeDir\auth_setup.py`""
-Write-Host ""
-Write-Host "  3. Companion.exe starten — Fibi sollte sich auf der Taskleiste melden."
+Write-Host 'Naechste Schritte:'
+Write-Host '  1. Lege eine .env-Datei neben Companion.exe an (siehe .env.example).'
+Write-Host '     Mindestens ANTHROPIC_API_KEY + ICLOUD_USERNAME + ICLOUD_APP_PASSWORD.'
+Write-Host ''
+Write-Host '  2. Einmalig die iCloud-Auth (Apple-Passwort + 2FA-Code):'
+Write-Host '     bridge\pyicloud\.venv\Scripts\python.exe bridge\pyicloud\auth_setup.py'
+Write-Host ''
+Write-Host '  3. Companion.exe starten - Fibi sollte sich auf der Taskleiste melden.'
 Write-Host ""
 Read-Host "Enter zum Schließen"
