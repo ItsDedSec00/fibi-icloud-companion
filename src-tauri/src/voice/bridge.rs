@@ -79,14 +79,18 @@ pub fn spawn(app: AppHandle) {
 pub async fn run_loop(app: AppHandle) -> Result<()> {
     let (program, script) = bridge_command()?;
     tracing::info!("spawning voice bridge: {} {}", program.display(), script.display());
-    let mut child = Command::new(&program)
-        .arg(&script)
+    let mut cmd = Command::new(&program);
+    cmd.arg(&script)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()
-        .context("could not spawn voice_bridge.py")?;
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(crate::paths::CREATE_NO_WINDOW);
+    }
+    let mut child = cmd.spawn().context("could not spawn voice_bridge.py")?;
 
     let stdout = child
         .stdout

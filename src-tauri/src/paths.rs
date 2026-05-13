@@ -16,6 +16,12 @@ pub const SETUP_HINT: &str =
     "Python-Sidecar-venv fehlt. Rechtsklick auf `bridge\\setup.ps1` → \
      `Mit PowerShell ausführen`. Voraussetzung: Python 3.12 installiert.";
 
+/// Windows process creation flag that suppresses the console window for
+/// a child process. Applied to every Python subprocess we spawn so the
+/// user never sees a CMD window flash open.
+#[cfg(windows)]
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 pub fn bridge_search_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {

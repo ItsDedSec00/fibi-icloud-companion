@@ -75,19 +75,23 @@ impl BridgeProcess {
             program.display(),
             script.display()
         );
-        let mut child = Command::new(&program)
-            .arg(&script)
+        let mut cmd = Command::new(&program);
+        cmd.arg(&script)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
-            .kill_on_drop(true)
-            .spawn()
-            .with_context(|| {
-                format!(
-                    "konnte pyicloud-bridge nicht starten ({})",
-                    program.display()
-                )
-            })?;
+            .kill_on_drop(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(crate::paths::CREATE_NO_WINDOW);
+        }
+        let mut child = cmd.spawn().with_context(|| {
+            format!(
+                "konnte pyicloud-bridge nicht starten ({})",
+                program.display()
+            )
+        })?;
         let stdin = child
             .stdin
             .take()

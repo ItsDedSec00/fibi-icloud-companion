@@ -41,13 +41,16 @@ async fn run_helper(args: &[&str]) -> Result<serde_json::Value> {
     for a in args {
         cmd.arg(*a);
     }
-    let mut child = cmd
-        .stdin(Stdio::null())
+    cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()
-        .context("spawn reauth_helper.py")?;
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(crate::paths::CREATE_NO_WINDOW);
+    }
+    let mut child = cmd.spawn().context("spawn reauth_helper.py")?;
 
     let stdout = child
         .stdout
