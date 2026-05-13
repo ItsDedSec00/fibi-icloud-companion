@@ -54,10 +54,10 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../bridge/pyicloud/.venv/**/*": "bridge/pyicloud/.venv/",
       "../bridge/pyicloud/*.py": "bridge/pyicloud/",
       "../bridge/models/fibi.onnx": "bridge/models/fibi.onnx",
       "../bridge/models/ggml-small.bin": "bridge/models/ggml-small.bin",
+      "../bridge/setup.ps1": "bridge/setup.ps1",
       "../.env.example": ".env.example"
     }
   },

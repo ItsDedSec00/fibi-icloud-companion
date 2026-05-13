@@ -139,9 +139,9 @@ fn bridge_command() -> Result<(PathBuf, PathBuf)> {
         &["bridge", "pyicloud", ".venv", "Scripts", "python.exe"],
         5,
     )
-    .ok_or_else(|| anyhow!("bridge/pyicloud/.venv/Scripts/python.exe nicht gefunden"))?;
+    .ok_or_else(|| anyhow!(crate::paths::SETUP_HINT))?;
     let script = crate::paths::find_under_bridge(&["bridge", "pyicloud", "bridge.py"], 5)
-        .ok_or_else(|| anyhow!("bridge/pyicloud/bridge.py nicht gefunden"))?;
+        .ok_or_else(|| anyhow!("bridge.py fehlt — Installation defekt?"))?;
     Ok((py, script))
 }
 

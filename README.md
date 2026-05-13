@@ -63,60 +63,59 @@ src/settings/               settings window (iCloud re-auth)
 src/shared/ipc.ts           typed IPC surface
 ```
 
-## Requirements
+## Install (NSIS installer)
 
-- Windows 10 / 11
-- Rust toolchain (cargo) + LLVM (for `whisper-rs` bindgen) + CMake
-- Node 20+ + pnpm
-- Python 3.12 for the sidecars
-- A reasonably modern microphone if you want voice
+1. **Python 3.12 first.** Download from
+   [python.org](https://www.python.org/downloads/) and tick *"Add python.exe
+   to PATH"*. The sidecars rely on the system Python — the installer
+   doesn't bundle one.
+2. Run `Companion_X.Y.Z_x64-setup.exe`.
+3. Right-click the installed `bridge\setup.ps1` → *"Run with PowerShell"*.
+   It creates `bridge\pyicloud\.venv` and pip-installs the sidecar deps
+   (openWakeWord, sounddevice, scipy, faster-whisper, pyicloud). Takes a
+   couple of minutes once.
+4. Drop a `.env` next to `Companion.exe` (copy `.env.example` and fill).
+   At minimum `ANTHROPIC_API_KEY`, plus iCloud / IMAP creds for the
+   integrations you want.
+5. One-time Apple-ID auth — the Settings window's *"iCloud neu
+   verbinden…"* drives the password + 2FA flow.
 
-## Setup
+Done. Fibi shows up on the taskbar; right-click her for the quick menu,
+say *"Fibi"* for voice.
+
+## Build from source
+
+Requirements (build host):
+- Rust toolchain (cargo)
+- LLVM (for `whisper-rs` bindgen) — `winget install LLVM.LLVM`, then
+  `setx LIBCLANG_PATH "C:\Program Files\LLVM\bin"`
+- CMake — `winget install Kitware.CMake`
+- Node 20+ + pnpm — `winget install OpenJS.NodeJS.LTS; npm i -g pnpm`
+- Python 3.12 (same as runtime)
 
 ```powershell
-# Native build deps (one-time)
-winget install LLVM.LLVM Kitware.CMake OpenJS.NodeJS.LTS
-# After install: ensure LIBCLANG_PATH is set:
-#   setx LIBCLANG_PATH "C:\Program Files\LLVM\bin"
-# and that CMake's bin is on PATH.
-npm install -g pnpm
-
-# Frontend deps
+git clone https://github.com/ItsDedSec00/fibi-icloud-companion.git
+cd fibi-icloud-companion
 pnpm install
 
-# Python sidecar venv (300 MB once)
-python -m venv bridge\pyicloud\.venv
-bridge\pyicloud\.venv\Scripts\python.exe -m pip install `
-    openwakeword sounddevice scipy faster-whisper `
-    git+https://github.com/timlaing/pyicloud.git
+# Dev venv for the sidecars (same script as the installer ships)
+powershell -ExecutionPolicy Bypass -File bridge\setup.ps1
 
-# Whisper model — German `small` (~470 MB)
-mkdir bridge\models -Force
-Invoke-WebRequest `
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin" `
-    -OutFile "bridge\models\ggml-small.bin"
+# Whisper model — German `small` (~470 MB), not in git
+curl -L `
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin" `
+  -o bridge\models\ggml-small.bin
 
-# Wake-word model — train your own at openWakeWord's Colab. For better
-# recall, record ~150 samples of yourself saying "Fibi" with:
+# Wake-word model — train your own at openWakeWord's Colab. For decent
+# recall, record ~150 samples of yourself saying "Fibi" first:
 bridge\pyicloud\.venv\Scripts\python.exe bridge\pyicloud\record_samples.py
-# Upload the resulting bridge/training/pixel/ ZIP into the Colab, train
-# with custom_positive_data, drop the resulting .onnx as
+# Upload bridge/training/pixel/ as a ZIP to the Colab, train with
+# `custom_positive_data`, drop the resulting .onnx at
 # bridge\models\fibi.onnx.
 
-# Config
-copy .env.example .env
-# Edit .env: ANTHROPIC_API_KEY, ICLOUD_USERNAME, ICLOUD_APP_PASSWORD,
-# IMAP/SMTP if you want mail, ICLOUD_CALENDARS whitelist if you have many.
-
-# One-time iCloud auth (Apple-ID password + 2FA on a trusted device)
-bridge\pyicloud\.venv\Scripts\python.exe bridge\pyicloud\auth_setup.py
-```
-
-## Run
-
-```powershell
-pnpm tauri dev      # development with HMR
-pnpm tauri build    # production MSI + NSIS installer
+copy .env.example .env  # then fill in the keys
+pnpm tauri dev          # iterate
+pnpm tauri build        # produces target\release\bundle\nsis\…-setup.exe
 ```
 
 ## Privacy / What leaves your machine

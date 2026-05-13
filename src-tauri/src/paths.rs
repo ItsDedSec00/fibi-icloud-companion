@@ -9,6 +9,13 @@
 
 use std::path::PathBuf;
 
+/// Shared error string for the "Python sidecar venv is missing" case.
+/// We point the user at the bundled `setup.ps1` rather than telling them
+/// to recreate the venv by hand.
+pub const SETUP_HINT: &str =
+    "Python-Sidecar-venv fehlt. Rechtsklick auf `bridge\\setup.ps1` → \
+     `Mit PowerShell ausführen`. Voraussetzung: Python 3.12 installiert.";
+
 pub fn bridge_search_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {
