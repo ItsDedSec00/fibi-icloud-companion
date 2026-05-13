@@ -1,0 +1,55 @@
+# Build artefacts
+node_modules/
+dist/
+.vite/
+src-tauri/target/
+src-tauri/gen/
+.DS_Store
+
+# Logs
+*.log
+vite.log
+vite-err.log
+
+# Secrets — NEVER commit credentials
+.env
+.env.local
+.env.*.local
+
+# Python sidecar — recreated via `uv venv` + pip install (see README)
+bridge/pyicloud/.venv/
+bridge/pyicloud/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Models — large + user/license-specific, fetched/trained separately
+# (see bridge/models/README.md). pixel/fibi wake-words are trained on
+# David's voice and should not be redistributed.
+bridge/models/*.bin
+bridge/models/*.onnx
+bridge/models/*.tflite
+
+# Voice-training samples — recordings of the user's voice, private
+bridge/training/
+
+# pyicloud session cookies + cached state (keychain-adjacent)
+.pyicloud/
+
+# Dev smoke tests with hardcoded personal username — not for public repo.
+# auth_setup.py / bridge.py / voice_bridge.py / reauth_helper.py / etc.
+# are the production sidecars and stay tracked.
+bridge/pyicloud/test_bridge.py
+bridge/pyicloud/retry_test.py
+bridge/pyicloud/oww_recall_test.py
+bridge/pyicloud/oww_offline_test.py
+bridge/pyicloud/oww_offline_test_fibi.py
+bridge/pyicloud/voice_smoketest.py
+
+# Tauri-bundled debug stuff
+*.pdb
+
+# OS / IDE
+Thumbs.db
+.idea/
+.vscode/

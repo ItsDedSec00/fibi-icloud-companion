@@ -1,0 +1,81 @@
+[package]
+name = "companion"
+version = "0.1.0"
+description = "Desktop pet that lives on the Windows taskbar"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "companion_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "companion"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+futures-util = "0.3"
+eventsource-stream = "0.2"
+
+rusqlite = { version = "0.31", features = ["bundled"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+quick-xml = "0.36"
+icalendar = "0.16"
+uuid = { version = "1", features = ["v4"] }
+sysinfo = "0.32"
+
+# Voice: native STT (whisper.cpp via FFI, ~half the RAM of faster-whisper)
+# + cross-platform mic capture via cpal.
+whisper-rs = "0.16"
+cpal = "0.15"
+hound = "3.5"
+
+# Secrets: Windows Credential Manager (and platform-native equivalents)
+# for the Anthropic API key, set via the Settings window.
+keyring = "3"
+
+# Mail: IMAP read access (Ionos / generic IMAPS) + SMTP send.
+imap = "3.0.0-alpha.15"
+mail-parser = "0.9"
+native-tls = "0.2"
+lettre = { version = "0.11", default-features = false, features = [
+    "smtp-transport",
+    "builder",
+    "tokio1-native-tls",
+    "tokio1",
+] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+windows = { version = "0.58", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Accessibility",
+    "Win32_System_SystemInformation",
+    "Win32_System_LibraryLoader",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

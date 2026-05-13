@@ -1,0 +1,885 @@
+:root {
+  color-scheme: dark;
+  /*
+   * Sprite atlas layout:
+   *   - Each frame is 32×32 native px (8 cols × 10 rows in the sheet).
+   *   - The cat's resting silhouette is ~12×12 px and bottom-center anchored,
+   *     but action frames (run, jump, humpback) extend horizontally outside
+   *     that 12×12 — so we render the FULL 32×32 frame to avoid clipping.
+   *   - --sprite-content-h is the height of the cat's resting silhouette
+   *     (used by JS to anchor the chat bubble to the visible cat's top
+   *     instead of the element's top, which has 20 px of transparent
+   *     headroom above the cat).
+   */
+  --sprite-scale: 4;
+  --frame-size: calc(32px * var(--sprite-scale));
+  --sprite-content-h: calc(12px * var(--sprite-scale));
+  --bubble-bg: rgba(36, 36, 43, 0.96);
+  --bubble-border: rgba(255, 255, 255, 0.08);
+  --bubble-soft: rgba(26, 26, 31, 0.7);
+  --bubble-text: #ececf1;
+  --bubble-text-dim: #9b9ba5;
+  /* Sakura / Kirschblüten-Rosa. Defined as RGB triplet (no commas) so
+   * `rgb(var(--sakura-rgb) / 0.4)` works inline. `--bubble-accent` is the
+   * solid alias used where we don't need alpha. */
+  --sakura-rgb: 255 183 200;
+  --bubble-accent: rgb(var(--sakura-rgb));
+  --bubble-user: rgba(122, 138, 168, 0.35);
+  --bubble-danger: #e88080;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ── Debug overlay (toggled by right-click on the cat) ──────────────────── */
+
+#debug {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  min-width: 220px;
+  background: rgba(20, 20, 26, 0.88);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px 6px;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #c9c9d3;
+  pointer-events: none;
+  user-select: text;
+  -webkit-user-select: text;
+  z-index: 100;
+}
+
+#debug[hidden] {
+  display: none !important;
+}
+
+#debug .row {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 6px;
+}
+
+#debug .k {
+  color: #7a7a86;
+}
+
+#debug .v {
+  color: #d8d8e2;
+  word-break: break-all;
+}
+
+#debug .hint {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  color: #6a6a76;
+  font-size: 10px;
+}
+
+/* ── Cat ────────────────────────────────────────────────────────────────── */
+
+#cat {
+  position: absolute;
+  bottom: 0;
+  left: 40px;
+  width: var(--frame-size);
+  height: var(--frame-size);
+  pointer-events: auto;
+  cursor: pointer;
+  transform-origin: bottom center;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+
+#cat.facing-left {
+  transform: scaleX(-1);
+}
+
+/* ── Quick menu (right-click on cat) ────────────────────────────────────── */
+
+#quickmenu {
+  position: absolute;
+  min-width: 170px;
+  background: rgba(36, 36, 43, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  z-index: 90;
+  animation: bubble-in 0.14s ease-out both;
+}
+
+#quickmenu[hidden] {
+  display: none !important;
+}
+
+.qm-item {
+  background: transparent;
+  border: none;
+  color: var(--bubble-text);
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  padding: 7px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qm-item:hover,
+.qm-item:focus-visible {
+  background: rgb(var(--sakura-rgb) / 0.18);
+  color: var(--bubble-accent);
+  outline: none;
+}
+
+.qm-item:disabled {
+  color: var(--bubble-text-dim);
+  cursor: not-allowed;
+}
+
+/* ── Reminder toast (proactive notifications) ──────────────────────────── */
+
+#toast {
+  position: absolute;
+  width: 240px;
+  background: rgba(36, 36, 43, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgb(var(--sakura-rgb) / 0.4);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  cursor: pointer;
+  color: var(--bubble-text);
+  font-size: 12.5px;
+  line-height: 1.45;
+  transform-origin: bottom left;
+  animation: bubble-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+#toast[hidden] {
+  display: none !important;
+}
+
+#toast p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+
+/* ── Rich cards (events / reminders / weather) ───────────────────────────
+ *
+ * Claude emits ```card-X {json}``` blocks; the frontend renders them as
+ * compact tiles inside the chat bubble OR voice toast. Same dark, soft-
+ * rounded look the rest of Fibi's chrome uses.
+ */
+
+.card {
+  background: rgba(28, 28, 33, 0.86);
+  border: 1px solid rgb(var(--sakura-rgb) / 0.28);
+  border-radius: 10px;
+  padding: 8px 10px 9px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--bubble-text);
+}
+
+.msg.assistant .card:first-child,
+#toast-text .card:first-child {
+  margin-top: 4px;
+}
+
+.card-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgb(var(--sakura-rgb) / 0.9);
+  margin-bottom: 5px;
+}
+
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-list li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.card-list li.empty {
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.55);
+}
+
+/* Events */
+.card-events .evt-time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #cfe9ff;
+  min-width: 38px;
+}
+.card-events .evt-title {
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+.card-events .evt-loc {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: rgba(232, 232, 236, 0.55);
+  font-style: italic;
+}
+
+/* Reminders */
+.card-reminders .rem-title {
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+.card-reminders .rem-due {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  background: rgb(var(--sakura-rgb) / 0.18);
+  color: #ffd6e0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Weather */
+.card-weather .wx-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 0;
+}
+.card-weather .wx-now {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #ffe9b6;
+}
+.card-weather .wx-meta {
+  display: flex;
+  flex-direction: column;
+}
+.card-weather .wx-summary {
+  font-size: 12px;
+  color: var(--bubble-text);
+}
+.card-weather .wx-range {
+  font-size: 10.5px;
+  color: rgba(232, 232, 236, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.card-weather .wx-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(232, 232, 236, 0.1);
+}
+.card-weather .wx-hour {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 10px;
+  color: rgba(232, 232, 236, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+.card-weather .wx-icon {
+  font-size: 13px;
+}
+
+/* Prose paragraph living next to cards in the same assistant msg. */
+.msg.assistant .prose {
+  margin-bottom: 2px;
+}
+.msg.assistant .prose:empty {
+  display: none;
+}
+
+/* ── Hot-plate under Fibi (CPU heat indicator) ─────────────────────────
+ *
+ * Driven by the `cat://heat` event from platform::cpu. Three states:
+ *   cool → hidden
+ *   warm → soft orange glow + 1 wavy line
+ *   hot  → red-orange glow + 3 shimmering wavy lines (animated)
+ *
+ * Sits below the cat's feet, follows the cat each frame (positioned by
+ * cat.ts like the toast and indicator). Pointer-events:none so it never
+ * intercepts mouse clicks on whatever's under the cat window.
+ */
+
+#heatplate {
+  position: absolute;
+  width: calc(14px * var(--sprite-scale));
+  height: calc(8px * var(--sprite-scale));
+  pointer-events: none;
+  /* In FRONT of the cat sprite so the rising shimmer pixels pass through
+   * her silhouette (looks like steam) rather than vanishing behind her. */
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  filter: drop-shadow(0 0 calc(6px * var(--sprite-scale)) rgba(255, 140, 0, 0.6));
+  opacity: 0;
+  transition: opacity 0.9s ease, filter 0.6s ease;
+}
+
+/* Subtle but actually visible — gimmick, not status bar. */
+#heatplate.visible {
+  opacity: 0.55;
+}
+#heatplate[data-state="hot"].visible {
+  opacity: 0.75;
+}
+
+.hp-glow {
+  width: 100%;
+  height: calc(3px * var(--sprite-scale));
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 200, 80, 0.95) 0%,
+    rgba(255, 140, 0, 0.7) 40%,
+    rgba(255, 80, 30, 0.35) 70%,
+    transparent 100%
+  );
+  image-rendering: pixelated;
+}
+
+/* Heat-shimmer waves above the plate. Container sits ABOVE the plate so
+ * the rising pixels have real room to travel up past Fibi's belly. */
+.hp-shimmer {
+  position: absolute;
+  bottom: 60%;
+  width: 100%;
+  height: calc(16px * var(--sprite-scale));
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hp-shimmer span {
+  display: block;
+  width: calc(1px * var(--sprite-scale));
+  height: calc(4px * var(--sprite-scale));
+  background: linear-gradient(
+    to top,
+    rgba(255, 160, 80, 0.0) 0%,
+    rgba(255, 180, 100, 0.65) 40%,
+    rgba(255, 210, 140, 0.95) 100%
+  );
+  border-radius: 1px;
+  animation: hp-rise 1.6s ease-in-out infinite;
+}
+.hp-shimmer span:nth-child(2) { animation-delay: 0.4s; }
+.hp-shimmer span:nth-child(3) { animation-delay: 0.8s; }
+
+/* WARM: subtle, no shimmer */
+#heatplate[data-state="warm"] {
+  filter: drop-shadow(0 0 calc(6px * var(--sprite-scale)) rgba(255, 160, 60, 0.55));
+}
+#heatplate[data-state="warm"] .hp-glow {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 200, 120, 0.85) 0%,
+    rgba(255, 150, 60, 0.55) 50%,
+    transparent 100%
+  );
+}
+
+/* HOT: brighter red glow, shimmer ON, plate pulses */
+#heatplate[data-state="hot"] {
+  filter: drop-shadow(0 0 calc(10px * var(--sprite-scale)) rgba(255, 70, 30, 0.85));
+}
+#heatplate[data-state="hot"] .hp-glow {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 230, 150, 1) 0%,
+    rgba(255, 110, 30, 0.95) 35%,
+    rgba(220, 50, 10, 0.65) 70%,
+    transparent 100%
+  );
+  animation: hp-pulse 1.2s ease-in-out infinite;
+}
+#heatplate[data-state="hot"] .hp-shimmer {
+  opacity: 1;
+}
+
+@keyframes hp-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.1); }
+}
+
+@keyframes hp-rise {
+  0% {
+    transform: translateY(0) scaleY(0.3);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(calc(-12px * var(--sprite-scale))) scaleY(0.7);
+    opacity: 0;
+  }
+}
+
+/* Bonus: when sleeping warm/hot, Fibi gets a subtle rim-light from below.
+ * Filter is animated so the glow swells in / fades out with the plate. */
+#cat svg,
+#cat #cat-sprite {
+  transition: filter 0.9s ease;
+}
+#cat.heat-warm svg,
+#cat.heat-warm #cat-sprite {
+  filter: drop-shadow(0 calc(1px * var(--sprite-scale)) calc(3px * var(--sprite-scale)) rgba(255, 150, 60, 0.2));
+}
+#cat.heat-hot svg,
+#cat.heat-hot #cat-sprite {
+  filter: drop-shadow(0 calc(1px * var(--sprite-scale)) calc(4px * var(--sprite-scale)) rgba(255, 80, 30, 0.3));
+}
+
+
+/* ── Pixel-art status indicator (loading dots / ready exclamation) ───────
+ *
+ * Shown above the cat's head when the user closes the chat bubble before
+ * a response arrives. State driven by [data-state]:
+ *   loading → bouncing pixel dots (request running)
+ *   ready   → pixel "!" (answer waiting, click cat to read)
+ *
+ * 12×12 SVG viewbox scaled to ~half a sprite-frame, so the icon reads as a
+ * little notification above the cat without dominating the silhouette. */
+
+#status-indicator {
+  position: absolute;
+  width: calc(8px * var(--sprite-scale));
+  height: calc(8px * var(--sprite-scale));
+  pointer-events: auto;
+  cursor: pointer;
+  image-rendering: pixelated;
+  z-index: 6;
+  animation: bubble-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+#status-indicator[hidden] {
+  display: none !important;
+}
+
+#status-indicator svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+
+#status-indicator[data-state="loading"] .indicator-loading {
+  display: block;
+}
+
+#status-indicator[data-state="listening"] .indicator-listening {
+  display: block;
+}
+
+#status-indicator[data-state="ready"] .indicator-bang {
+  display: block;
+  /* Subtle pulse so the "!" is harder to miss in peripheral vision. */
+  animation: indicator-bang-pulse 1.4s ease-in-out infinite;
+}
+
+.indicator-loading .dot {
+  fill: var(--bubble-accent);
+  animation: indicator-dot-bounce 1.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.indicator-loading .dot-2 {
+  animation-delay: 0.15s;
+}
+
+.indicator-loading .dot-3 {
+  animation-delay: 0.3s;
+}
+
+@keyframes indicator-dot-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-1px);
+    opacity: 1;
+  }
+}
+
+/* Listening bars — anchored to the bottom of each bar so they grow/shrink
+ * upward like a VU meter. Three offset phases give a fluid audio-level
+ * appearance without looking mechanical. */
+.indicator-listening .bar {
+  fill: var(--bubble-accent);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: indicator-bar-pulse 0.9s ease-in-out infinite;
+}
+
+.indicator-listening .bar-1 { animation-delay: 0s; }
+.indicator-listening .bar-2 { animation-delay: 0.12s; }
+.indicator-listening .bar-3 { animation-delay: 0.24s; }
+
+@keyframes indicator-bar-pulse {
+  0%, 100% {
+    transform: scaleY(0.35);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scaleY(1.0);
+    opacity: 1;
+  }
+}
+
+@keyframes indicator-bang-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+
+/* ── Thought bubble ─────────────────────────────────────────────────────── */
+
+#bubble {
+  position: absolute;
+  width: 280px;
+  /* `bottom` and `left` are computed in JS to anchor top-right of the cat's head. */
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+  /* Container itself is invisible — only the individual message bubbles and
+     the input have a visible surface. The container still captures clicks
+     so the user can dismiss by clicking its empty area (see click handler
+     in cat.ts). */
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  color: var(--bubble-text);
+  font-size: 12.5px;
+  transform-origin: bottom left;
+  animation: bubble-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+#bubble[hidden] {
+  display: none !important;
+}
+
+@keyframes bubble-in {
+  from {
+    transform: scale(0.5) translate(-8px, 8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translate(0, 0);
+    opacity: 1;
+  }
+}
+
+/* Messages */
+#messages {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  scroll-behavior: smooth;
+}
+
+/* When empty, the messages area collapses so the bubble shrinks to just the input. */
+#messages:empty {
+  display: none;
+}
+
+.msg {
+  max-width: 90%;
+  padding: 7px 10px;
+  border-radius: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 12.5px;
+  /* Each bubble stands alone now (no container background), so it needs
+     its own shadow + backdrop blur to stay readable over any desktop. */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: rgba(70, 86, 116, 0.92);
+  border-bottom-right-radius: 4px;
+}
+
+.msg.assistant {
+  align-self: flex-start;
+  background: rgba(36, 36, 43, 0.92);
+  border-bottom-left-radius: 4px;
+}
+
+.msg.assistant.streaming::after {
+  content: "▍";
+  margin-left: 1px;
+  animation: caret 1s steps(2) infinite;
+  color: var(--bubble-accent);
+}
+
+.msg.error,
+.msg.system {
+  align-self: stretch;
+  background: rgba(232, 128, 128, 0.12);
+  border: 1px solid rgba(232, 128, 128, 0.4);
+  color: var(--bubble-danger);
+  font-size: 11.5px;
+  border-radius: 8px;
+}
+
+.msg.hint {
+  align-self: stretch;
+  background: rgb(var(--sakura-rgb) / 0.1);
+  border: 1px solid rgb(var(--sakura-rgb) / 0.3);
+  color: var(--bubble-text-dim);
+  font-size: 11.5px;
+  border-radius: 8px;
+}
+
+.msg.hint code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--bubble-accent);
+  font-size: 11px;
+}
+
+@keyframes caret {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+#messages::-webkit-scrollbar {
+  width: 4px;
+}
+#messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+/* Input */
+#input {
+  width: 100%;
+  resize: none;
+  padding: 7px 10px;
+  background: rgba(26, 26, 31, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: var(--bubble-text);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  max-height: 80px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+#input:focus {
+  outline: none;
+  border-color: var(--bubble-accent);
+}
+
+#input::placeholder {
+  color: var(--bubble-text-dim);
+  opacity: 0.6;
+}
+
+/* ── Sprite-sheet mode ─────────────────────────────────────────────────── */
+
+#cat-sprite {
+  width: 100%;
+  height: 100%;
+  background-image: url("/sprites/cat.png");
+  background-repeat: no-repeat;
+  background-size: calc(8 * var(--frame-size)) calc(10 * var(--frame-size));
+  background-position: 0 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: none;
+}
+
+#cat[data-mode="sprite"] #cat-sprite {
+  display: block;
+}
+#cat[data-mode="sprite"] #cat-svg {
+  display: none;
+}
+
+/* Each keyframe walks one row of the sheet from col 0 to col N-1. */
+@keyframes sprite-row-0 {
+  from { background-position: 0 0; }
+  to   { background-position: calc(-4 * var(--frame-size)) 0; }
+}
+@keyframes sprite-row-1 {
+  from { background-position: 0 calc(-1 * var(--frame-size)); }
+  to   { background-position: calc(-4 * var(--frame-size)) calc(-1 * var(--frame-size)); }
+}
+@keyframes sprite-row-2 {
+  from { background-position: 0 calc(-2 * var(--frame-size)); }
+  to   { background-position: calc(-4 * var(--frame-size)) calc(-2 * var(--frame-size)); }
+}
+@keyframes sprite-row-3 {
+  from { background-position: 0 calc(-3 * var(--frame-size)); }
+  to   { background-position: calc(-4 * var(--frame-size)) calc(-3 * var(--frame-size)); }
+}
+@keyframes sprite-row-4 {
+  from { background-position: 0 calc(-4 * var(--frame-size)); }
+  to   { background-position: calc(-8 * var(--frame-size)) calc(-4 * var(--frame-size)); }
+}
+@keyframes sprite-row-5 {
+  from { background-position: 0 calc(-5 * var(--frame-size)); }
+  to   { background-position: calc(-8 * var(--frame-size)) calc(-5 * var(--frame-size)); }
+}
+@keyframes sprite-row-6 {
+  from { background-position: 0 calc(-6 * var(--frame-size)); }
+  to   { background-position: calc(-4 * var(--frame-size)) calc(-6 * var(--frame-size)); }
+}
+@keyframes sprite-row-8 {
+  from { background-position: 0 calc(-8 * var(--frame-size)); }
+  to   { background-position: calc(-7 * var(--frame-size)) calc(-8 * var(--frame-size)); }
+}
+@keyframes sprite-row-9 {
+  from { background-position: 0 calc(-9 * var(--frame-size)); }
+  to   { background-position: calc(-8 * var(--frame-size)) calc(-9 * var(--frame-size)); }
+}
+
+#cat.anim-idle1 #cat-sprite  { animation: sprite-row-0 0.7s steps(4) infinite; }
+#cat.anim-idle2 #cat-sprite  { animation: sprite-row-1 0.7s steps(4) infinite; }
+#cat.anim-lick1 #cat-sprite  { animation: sprite-row-2 0.5s steps(4) infinite; }
+#cat.anim-lick2 #cat-sprite  { animation: sprite-row-3 0.5s steps(4) infinite; }
+#cat.anim-run   #cat-sprite  { animation: sprite-row-4 0.55s steps(8) infinite; }
+#cat.anim-run-long #cat-sprite { animation: sprite-row-5 0.55s steps(8) infinite; }
+#cat.anim-sleep #cat-sprite  { animation: sprite-row-6 1.4s steps(4) infinite; }
+#cat.anim-jump  #cat-sprite  { animation: sprite-row-8 0.7s steps(7) 1 forwards; }
+#cat.anim-humpback #cat-sprite { animation: sprite-row-9 0.9s steps(8) 1 forwards; }
+
+/* ── SVG fallback animations ──────────────────────────────────────────── */
+
+#cat[data-mode="svg"] #cat-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+#cat[data-mode="svg"] #cat-sprite {
+  display: none;
+}
+
+#cat[data-mode="svg"].anim-idle1 #tail,
+#cat[data-mode="svg"].anim-idle2 #tail {
+  transform-origin: 18px 64px;
+  animation: tail-sway 3.2s ease-in-out infinite;
+}
+#cat[data-mode="svg"].anim-idle1 #body,
+#cat[data-mode="svg"].anim-idle2 #body,
+#cat[data-mode="svg"].anim-idle1 #belly,
+#cat[data-mode="svg"].anim-idle2 #belly {
+  transform-origin: center;
+  animation: breathe 3.6s ease-in-out infinite;
+}
+#cat[data-mode="svg"].anim-sleep #body,
+#cat[data-mode="svg"].anim-sleep #belly {
+  transform-origin: center;
+  animation: breathe-deep 4.2s ease-in-out infinite;
+}
+#cat[data-mode="svg"].anim-run .leg-hind-back,
+#cat[data-mode="svg"].anim-run .leg-front-front,
+#cat[data-mode="svg"].anim-run-long .leg-hind-back,
+#cat[data-mode="svg"].anim-run-long .leg-front-front {
+  transform-origin: center top;
+  animation: leg-step-a 0.35s ease-in-out infinite;
+}
+#cat[data-mode="svg"].anim-run .leg-hind-front,
+#cat[data-mode="svg"].anim-run .leg-front-back,
+#cat[data-mode="svg"].anim-run-long .leg-hind-front,
+#cat[data-mode="svg"].anim-run-long .leg-front-back {
+  transform-origin: center top;
+  animation: leg-step-b 0.35s ease-in-out infinite;
+}
+
+@keyframes tail-sway {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(8deg); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50%      { transform: scale(1.015, 1.025); }
+}
+@keyframes breathe-deep {
+  0%, 100% { transform: scale(1, 1); }
+  50%      { transform: scale(1.03, 1.04); }
+}
+@keyframes leg-step-a {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-4px) rotate(10deg); }
+}
+@keyframes leg-step-b {
+  0%, 100% { transform: translateY(-4px) rotate(10deg); }
+  50%      { transform: translateY(0) rotate(0deg); }
+}

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8a8ad"/>
+      <stop offset="100%" stop-color="#5e5e66"/>
+    </linearGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d4d4d8"/>
+      <stop offset="100%" stop-color="#a8a8ad"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="#1a1a1f"/>
+  <!-- Head -->
+  <path d="M 70 70 L 92 36 L 110 70 Z" fill="url(#g)"/>
+  <path d="M 146 70 L 164 36 L 186 70 Z" fill="url(#g)"/>
+  <path d="M 78 60 L 92 44 L 104 60 Z" fill="#f4a8b8" opacity="0.7"/>
+  <path d="M 152 60 L 164 44 L 178 60 Z" fill="#f4a8b8" opacity="0.7"/>
+  <ellipse cx="128" cy="128" rx="80" ry="68" fill="url(#g)"/>
+  <ellipse cx="128" cy="140" rx="58" ry="44" fill="url(#b)"/>
+  <!-- Eyes -->
+  <ellipse cx="98" cy="118" rx="12" ry="14" fill="#1a1a1f"/>
+  <ellipse cx="158" cy="118" rx="12" ry="14" fill="#1a1a1f"/>
+  <circle cx="102" cy="113" r="3" fill="#fff"/>
+  <circle cx="162" cy="113" r="3" fill="#fff"/>
+  <!-- Nose + mouth -->
+  <path d="M 120 148 L 136 148 L 128 158 Z" fill="#f4a8b8"/>
+  <path d="M 128 158 Q 116 172 104 162 M 128 158 Q 140 172 152 162"
+    stroke="#3a3a40" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- Whiskers -->
+  <g stroke="#e8e8ec" stroke-width="2.4" stroke-linecap="round" opacity="0.9">
+    <line x1="62" y1="150" x2="38" y2="142"/>
+    <line x1="62" y1="158" x2="38" y2="166"/>
+    <line x1="194" y1="150" x2="218" y2="142"/>
+    <line x1="194" y1="158" x2="218" y2="166"/>
+  </g>
+</svg>

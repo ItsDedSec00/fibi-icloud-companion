@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fibi · Einstellungen</title>
+    <link rel="stylesheet" href="./settings.css" />
+  </head>
+  <body>
+    <main>
+      <h1>iCloud-Verbindung</h1>
+
+      <section>
+        <h2>Apple-ID neu verbinden</h2>
+        <p class="hint">
+          Apple's „Trust Token" läuft alle ~30 Tage ab. Wenn Fibi keine
+          Reminders mehr findet oder „needs_reauth" im Log steht, hier
+          einmal neu durchklicken. Apple-ID kommt aus deiner
+          <code>.env</code> (<code>ICLOUD_USERNAME</code>) — wird unten
+          angezeigt.
+        </p>
+
+        <div class="row">
+          <label>Apple-ID</label>
+          <span id="username-display" class="readonly">—</span>
+        </div>
+
+        <!-- Step 1: optional password (only needed first time / after logout) -->
+        <div id="step-password" class="step">
+          <label for="password">
+            Apple-ID Passwort
+            <span class="hint-inline">(leer lassen wenn schon gespeichert)</span>
+          </label>
+          <div class="row">
+            <input
+              type="password"
+              id="password"
+              placeholder="Apple-ID Passwort"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" id="toggle-show">Anzeigen</button>
+          </div>
+          <div class="actions">
+            <button type="button" id="start" class="primary">
+              Re-Auth starten
+            </button>
+            <span id="status" class="status"></span>
+          </div>
+        </div>
+
+        <!-- Step 2: shown after Apple pushes the 2FA code -->
+        <div id="step-2fa" class="step" hidden>
+          <p class="hint">
+            Apple hat einen 6-stelligen Code an deine vertrauten Geräte
+            geschickt. Eintippen und absenden:
+          </p>
+          <div class="row">
+            <input
+              type="text"
+              id="code"
+              placeholder="6-stelliger Code"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+            />
+            <button type="button" id="submit" class="primary">Bestätigen</button>
+          </div>
+          <span id="status-2fa" class="status"></span>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./settings.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fibi</title>
+    <link rel="stylesheet" href="./cat.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <!-- Debug overlay. Toggled by right-clicking the cat. -->
+      <div id="debug" hidden aria-hidden="true">
+        <div class="row"><span class="k">Idle</span><span class="v" id="dbg-idle">—</span></div>
+        <div class="row"><span class="k">Active</span><span class="v" id="dbg-active">—</span></div>
+        <div class="row"><span class="k">Woken</span><span class="v" id="dbg-woken">—</span></div>
+        <div class="row"><span class="k">Anim</span><span class="v" id="dbg-anim">—</span></div>
+        <div class="row"><span class="k">Weights</span><span class="v" id="dbg-weights">—</span></div>
+        <div class="row"><span class="k">Last pick</span><span class="v" id="dbg-last-pick">—</span></div>
+        <div class="row"><span class="k">Next in</span><span class="v" id="dbg-next">—</span></div>
+        <div class="row"><span class="k">Pos</span><span class="v" id="dbg-pos">—</span></div>
+        <div class="row"><span class="k">Sleep X</span><span class="v" id="dbg-sleep-x">—</span></div>
+        <div class="row"><span class="k">Flags</span><span class="v" id="dbg-flags">—</span></div>
+        <div class="row"><span class="k">Context</span><span class="v" id="dbg-context">—</span></div>
+        <div class="row"><span class="k">Calendars</span><span class="v" id="dbg-cals">—</span></div>
+        <div class="hint">Rechtsklick auf die Katze zum Schließen</div>
+      </div>
+
+      <!-- Quick menu shown by right-clicking Fibi. Each button fires a
+           canned chat query so the user gets the same rich-card answer
+           they'd get by typing or saying it. -->
+      <nav id="quickmenu" hidden role="menu">
+        <button class="qm-item" data-action="today" type="button">📅 Heute</button>
+        <button class="qm-item" data-action="week" type="button">🗓️ Diese Woche</button>
+        <button class="qm-item" data-action="weather" type="button">☁️ Wetter</button>
+        <button class="qm-item" data-action="reminders" type="button">🔔 Offene Reminder</button>
+        <button class="qm-item" data-action="mail" type="button">✉️ Neue Mails</button>
+      </nav>
+
+      <!-- Proactive reminder toast — fires for 1h-before / 9:00 / 12:00
+           events. Anchored above the cat like the chat bubble, read-only,
+           **stays until clicked**. After 60 s of inattention the cat starts
+           sprinting between far ends of the screen to demand the user's
+           attention (see `franticMode` in cat.ts). -->
+      <aside id="toast" hidden role="status">
+        <div id="toast-text"></div>
+      </aside>
+
+      <!-- Single-turn chat. Hidden until cat is clicked. The container
+           itself is transparent; only message bubbles and the input have
+           a visible surface. Clicking outside the bubble or losing window
+           focus closes it. -->
+      <aside id="bubble" hidden aria-label="Fibis Gedanken">
+        <main id="messages" aria-live="polite"></main>
+        <textarea
+          id="input"
+          rows="1"
+          placeholder="…"
+          aria-label="Nachricht"
+        ></textarea>
+      </aside>
+
+      <!-- Pixel-art status indicator that sits above the cat's head when
+           the chat bubble is closed but a request is still in flight. Two
+           visual states, controlled via data-state attribute:
+             "loading" → animated pixel dots (request running)
+             "ready"   → pixel exclamation mark (answer waiting) -->
+      <div id="status-indicator" hidden data-state="loading" aria-hidden="true">
+        <!-- 8×8 viewBox = same grid the cat sprite uses. Each rect = 1 native
+             pixel, so at sprite-scale 4 they render as crisp 4×4 css squares.
+             No outlines — keeps the silhouette light and matches the cat
+             style which also has no outlines.
+             States (toggled via data-state):
+               loading    → bouncing dots ("denken")
+               listening  → pulsing equalizer bars ("zuhören")
+               ready      → pixel exclamation ("fertig") -->
+        <svg
+          class="indicator-loading"
+          viewBox="0 0 8 8"
+          shape-rendering="crispEdges"
+        >
+          <rect class="dot dot-1" x="1" y="4" width="1" height="1" />
+          <rect class="dot dot-2" x="3" y="4" width="1" height="1" />
+          <rect class="dot dot-3" x="5" y="4" width="1" height="1" />
+        </svg>
+        <svg
+          class="indicator-listening"
+          viewBox="0 0 8 8"
+          shape-rendering="crispEdges"
+        >
+          <!-- Three vertical bars at different heights, each pulsing on
+               its own phase. Looks like a live audio-level meter — the
+               canonical "listening" affordance in pixel art. -->
+          <rect class="bar bar-1" x="1" y="3" width="1" height="3" />
+          <rect class="bar bar-2" x="3" y="2" width="1" height="4" />
+          <rect class="bar bar-3" x="5" y="4" width="1" height="2" />
+        </svg>
+        <svg
+          class="indicator-bang"
+          viewBox="0 0 8 8"
+          shape-rendering="crispEdges"
+        >
+          <!-- Stem: 1 px wide, 4 px tall. Dot: single 1×1 px below. -->
+          <rect x="4" y="1" width="1" height="4" fill="#ffb7c8" />
+          <rect x="4" y="6" width="1" height="1" fill="#ffb7c8" />
+        </svg>
+      </div>
+
+      <!-- Hot-plate under Fibi when CPU is warm/hot. Position is updated
+           every frame from cat.ts so it follows her around. State is
+           driven by the `cat://heat` event. -->
+      <div id="heatplate" data-state="cool" aria-hidden="true">
+        <div class="hp-glow"></div>
+        <div class="hp-shimmer">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <!-- Cat -->
+      <div id="cat" class="anim-idle1 facing-right" data-mode="svg">
+        <div id="cat-sprite" aria-hidden="true"></div>
+        <svg
+          id="cat-svg"
+          viewBox="0 0 120 96"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Fibi, die graue Katze"
+        >
+          <defs>
+            <linearGradient id="furGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#a8a8ad" />
+              <stop offset="100%" stop-color="#6e6e75" />
+            </linearGradient>
+            <linearGradient id="bellyGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#d4d4d8" />
+              <stop offset="100%" stop-color="#b0b0b6" />
+            </linearGradient>
+          </defs>
+          <path
+            id="tail"
+            d="M 18 64 Q 4 52 10 38 Q 14 30 22 34"
+            stroke="url(#furGradient)"
+            stroke-width="9"
+            stroke-linecap="round"
+            fill="none"
+          />
+          <ellipse class="leg leg-hind-back" cx="38" cy="80" rx="6" ry="10" />
+          <ellipse class="leg leg-front-back" cx="78" cy="80" rx="6" ry="10" />
+          <ellipse id="body" cx="58" cy="62" rx="34" ry="20" fill="url(#furGradient)" />
+          <ellipse id="belly" cx="58" cy="68" rx="22" ry="12" fill="url(#bellyGradient)" />
+          <ellipse class="leg leg-hind-front" cx="34" cy="80" rx="6" ry="10" />
+          <ellipse class="leg leg-front-front" cx="82" cy="80" rx="6" ry="10" />
+          <g id="head">
+            <path id="ear-left" d="M 78 30 L 84 16 L 92 28 Z" fill="url(#furGradient)" />
+            <path id="ear-right" d="M 96 28 L 104 16 L 106 30 Z" fill="url(#furGradient)" />
+            <path d="M 82 26 L 86 19 L 90 27 Z" fill="#f4a8b8" opacity="0.6" />
+            <path d="M 98 26 L 103 19 L 105 28 Z" fill="#f4a8b8" opacity="0.6" />
+            <ellipse cx="92" cy="42" rx="22" ry="19" fill="url(#furGradient)" />
+            <ellipse cx="92" cy="46" rx="16" ry="12" fill="url(#bellyGradient)" />
+            <g id="eyes">
+              <ellipse class="eye eye-left" cx="84" cy="40" rx="3" ry="3.5" fill="#1a1a1f" />
+              <ellipse class="eye eye-right" cx="98" cy="40" rx="3" ry="3.5" fill="#1a1a1f" />
+              <circle cx="85" cy="39" r="0.8" fill="#fff" />
+              <circle cx="99" cy="39" r="0.8" fill="#fff" />
+            </g>
+            <path d="M 90 47 L 94 47 L 92 49 Z" fill="#f4a8b8" />
+            <path
+              d="M 92 49 Q 89 52 86 50 M 92 49 Q 95 52 98 50"
+              stroke="#3a3a40"
+              stroke-width="0.8"
+              fill="none"
+              stroke-linecap="round"
+            />
+            <g stroke="#e8e8ec" stroke-width="0.6" stroke-linecap="round" opacity="0.85">
+              <line x1="76" y1="48" x2="68" y2="46" />
+              <line x1="76" y1="50" x2="68" y2="51" />
+              <line x1="108" y1="48" x2="116" y2="46" />
+              <line x1="108" y1="50" x2="116" y2="51" />
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <script type="module" src="./cat.ts"></script>
+  </body>
+</html>
